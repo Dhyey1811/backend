@@ -88,7 +88,18 @@ const resolvers = {
       );
       return updatedEmployee;
     },
-    
+    deleteEmployee: async (_, { id }) => {
+      const employee = await Employee.findById(id);
+      if (!employee) {
+        throw new ApolloError('Employee not found', 'NOT_FOUND');
+      }
+
+      if (employee.currentStatus === 'Active') {
+        throw new ApolloError("Can't delete the employee because their status is Active", 'VALIDATION_ERROR');
+      }
+
+      return await Employee.findByIdAndDelete(id);
+    },
   },
 };
 
