@@ -1,106 +1,97 @@
-const Employee = require('../../model/Employee');
-const { ApolloError } = require('apollo-server');
+describe('Employee Management E2E Test', () => {
+  beforeEach(() => {
+    cy.intercept('POST', '**/graphql').as('graphql');
+    cy.visit('/');
+    cy.wait('@graphql');
+  });
 
-const resolvers = {
-  Query: {
-    getEmployees: async (_, { employeeType }) => {
-      const filter = {};
-      if (employeeType!="ALL") {
-        filter.employeeType = employeeType;
-      }
-      return await Employee.find(filter);
-    },
-    getEmployee: async (_, { id }) => {
-      const employee = await Employee.findById(id);
-      if (!employee) {
-        throw new ApolloError('Employee not found', 'NOT_FOUND');
-      }
-      return employee;
-    }
-  },
-  Mutation: {
-    createEmployee: async (_, { firstName, lastName, age, dateOfJoining, title, department, employeeType, currentStatus }) => {
-      console.log(firstName, lastName, age, dateOfJoining, title, department, employeeType, currentStatus)
+  it('should load home and navigate to create page', () => {
+    cy.contains('Employee List', { timeout: 10000 }).should('exist');
+    cy.contains('Create Employee').click();
+    cy.url().should('include', '/create');
+  });
 
-      //Feedback: No/very little employee validation on the server side
-      // Added now
-    
-      if (!firstName || firstName.trim().length === 0) {
-        throw new Error("First name cannot be empty.");
-      }
-  
-      if (!lastName || lastName.trim().length === 0) {
-        throw new Error("Last name cannot be empty.");
-      }
-  
-      if (!age || parseInt(age) < 18 || parseInt(age) > 65) {
-        throw new Error("Invalid age. It must be a number between 18 and 65.");
-      }
-  
-      const parsedDate = new Date(dateOfJoining);
-      if (!dateOfJoining || isNaN(parsedDate.getTime())) {
-        throw new Error("Invalid date of joining. It must be a valid date.");
-      }
-  
-      if (currentStatus !== true && currentStatus !== false) {
-        throw new Error("Invalid current status. It must be either true or false.");
-      }
-      const newEmployee = new Employee({
-        firstName,
-        lastName,
-        age,
-        dateOfJoining,
-        title,
-        department,
-        employeeType,
-        currentStatus
-      });
-      return await newEmployee.save();
-    },
-    updateEmployee: async (_, { employeeId, currentStatus, firstName, lastName, age, dateOfJoining, title, department, employeeType }) => {
-      console.log(currentStatus, typeof currentStatus);
-      if (!employeeId) {
-        throw new ApolloError('Employee ID is required', 'VALIDATION_ERROR');
-      }
-      if (!title || !department) {
-        throw new ApolloError('All fields are required', 'VALIDATION_ERROR');
-      }
-      
-      // No need as we are not upadting age
+  it('should fill form and create employee', () => {
+    cy.visit('/create');
 
-      // if (isNaN(age) || age < 18) {
-      //   throw new ApolloError('Age must be a number and at least 18', 'VALIDATION_ERROR');
-      // }
-      
-      const updatedEmployee = await Employee.findByIdAndUpdate(
-        employeeId,
-        {
-          firstName,
-          lastName,
-          age,
-          dateOfJoining,
-          title,
-          department,
-          employeeType,
-          currentStatus
-        },
-        { new: true }
-      );
-      return updatedEmployee;
-    },
-    deleteEmployee: async (_, { id }) => {
-      const employee = await Employee.findById(id);
-      if (!employee) {
-        throw new ApolloError('Employee not found', 'NOT_FOUND');
-      }
+    cy.get('input[name="firstName"]').should('be.visible').type('John');
+    cy.get('input[name="lastName"]').type('Doe');
+    cy.get('input[name="age"]').type('35');
+    cy.get('input[name="dateOfJoining"]').type('2023-01-01');
 
-      if (employee.currentStatus === 'Active') {
-        throw new ApolloError("Can't delete the employee because their status is Active", 'VALIDATION_ERROR');
-      }
+    // Title dropdown
+    cy.get('#mui-component-select-title').click({ force: true });
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.contains('li', 'Manager').click();
 
-      return await Employee.findByIdAndDelete(id);
-    },
-  },
-};
+    // Department dropdown
+    cy.get('#mui-component-select-department').click({ force: true });
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.contains('li', 'HR').click();
 
-module.exports = resolvers;
+    // Employee Type dropdown
+    cy.get('#mui-component-select-employeeType').click({ force: true });
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.contains('li', 'FullTime').click();
+
+    // Current Status dropdown
+    cy.get('#mui-component-select-currentStatus').click({ force: true });
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.contains('li', 'Active').click();
+
+    // Submit
+    cy.contains('Add Employee').click();
+    cy.wait('@graphql');
+    cy.url().should('eq', 'http://localhost:3000/');
+    cy.wait('@graphql');
+  });
+
+  it('should show newly added employee in the list', () => {
+    cy.visit('/');
+    cy.wait('@graphql');
+    cy.get('table tbody', { timeout: 10000 }).should('exist');
+
+    cy.contains('John', { timeout: 5000 }).should('exist');
+    cy.contains('Doe').should('exist');
+  });
+
+  it('should navigate to detail page', () => {
+    cy.get('table tbody tr').first().within(() => {
+      cy.contains('Info').click();
+    });
+
+    cy.contains('Employee Details').should('exist');
+    cy.contains('Retirement Information').should('exist');
+  });
+
+  it('should update employee status to Inactive', () => {
+    cy.get('table tbody tr').first().within(() => {
+      cy.contains('Update').click();
+    });
+
+    cy.url().should('include', '/update');
+
+    // MUI-safe: find the status dropdown by label
+    cy.contains('Current Status').parents('[class*=MuiFormControl]').within(() => {
+      cy.get('[role="button"]').click({ force: true });
+    });
+
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.contains('li', 'Inactive').click();
+
+    cy.contains('Update Employee').click();
+    cy.wait('@graphql');
+    cy.url().should('eq', 'http://localhost:3000/');
+  });
+
+  it('should delete the employee', () => {
+    cy.get('table tbody tr').first().within(() => {
+      cy.contains('Delete').click();
+    });
+
+    cy.on('window:confirm', () => true);
+    cy.wait('@graphql');
+
+    cy.contains('John').should('not.exist');
+  });
+});
