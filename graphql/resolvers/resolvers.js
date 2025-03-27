@@ -39,7 +39,6 @@ describe('Employee Management E2E Test', () => {
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains('li', 'Active').click();
 
-    // Submit
     cy.contains('Add Employee').click();
     cy.wait('@graphql');
     cy.url().should('eq', 'http://localhost:3000/');
@@ -50,7 +49,6 @@ describe('Employee Management E2E Test', () => {
     cy.visit('/');
     cy.wait('@graphql');
     cy.get('table tbody', { timeout: 10000 }).should('exist');
-
     cy.contains('John', { timeout: 5000 }).should('exist');
     cy.contains('Doe').should('exist');
   });
@@ -71,11 +69,10 @@ describe('Employee Management E2E Test', () => {
 
     cy.url().should('include', '/update');
 
-    // MUI-safe: find the status dropdown by label
+    // ✅ MUI-safe: Select 'Inactive' from 'Current Status' dropdown
     cy.contains('Current Status').parents('[class*=MuiFormControl]').within(() => {
       cy.get('[role="button"]').click({ force: true });
     });
-
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains('li', 'Inactive').click();
 
@@ -89,9 +86,8 @@ describe('Employee Management E2E Test', () => {
       cy.contains('Delete').click();
     });
 
-    cy.on('window:confirm', () => true);
+    cy.on('window:confirm', () => true); // Accept confirmation
     cy.wait('@graphql');
-
     cy.contains('John').should('not.exist');
   });
 });
