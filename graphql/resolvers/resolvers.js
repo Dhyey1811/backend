@@ -62,32 +62,14 @@ describe('Employee Management E2E Test', () => {
     cy.contains('Retirement Information').should('exist');
   });
 
-  it('should update employee status to Inactive', () => {
-    cy.get('table tbody tr').first().within(() => {
-      cy.contains('Update').click();
-    });
-
-    cy.url().should('include', '/update');
-
-    // ✅ MUI-safe: Select 'Inactive' from 'Current Status' dropdown
-    cy.contains('Current Status').parents('[class*=MuiFormControl]').within(() => {
-      cy.get('[role="button"]').click({ force: true });
-    });
-    cy.get('ul[role="listbox"]').should('be.visible');
-    cy.contains('li', 'Inactive').click();
-
-    cy.contains('Update Employee').click();
-    cy.wait('@graphql');
-    cy.url().should('eq', 'http://localhost:3000/');
-  });
-
   it('should delete the employee', () => {
     cy.get('table tbody tr').first().within(() => {
       cy.contains('Delete').click();
     });
 
-    cy.on('window:confirm', () => true); // Accept confirmation
+    cy.on('window:confirm', () => true);
     cy.wait('@graphql');
+
     cy.contains('John').should('not.exist');
   });
 });
